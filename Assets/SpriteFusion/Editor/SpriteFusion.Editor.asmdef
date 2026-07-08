@@ -1,0 +1,7 @@
+{
+    "name": "SpriteFusion.Editor",
+    "rootNamespace": "SpriteFusion",
+    "includePlatforms": ["Editor"],
+    "references": [],
+    "autoReferenced": true
+}
