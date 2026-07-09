@@ -1,0 +1,11 @@
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.unitypackage binary
+*.cs text eol=lf
+*.asmdef text eol=lf
+*.meta text eol=lf
