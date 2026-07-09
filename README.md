@@ -2,6 +2,8 @@
 
 [Sprite Fusion](https://www.spritefusion.com/pixel-art-generator) is a professional pixel-art sprites and animations generator. This is the native plugin for the Unity editor.
 
+<img src="./static/spritefusion-generator.webp" alt="Sprite Fusion Pixel Art Generator" style="width: 100%;">
+
 ## Install
 
 1. Install the package from the Unity Asset Store, or download the latest `.unitypackage` release from GitHub.
@@ -27,8 +29,6 @@ Generated assets are written to `Assets/SpriteFusion/Generated`.
 
 - Website: https://www.spritefusion.com
 - Docs: https://www.spritefusion.com/docs/pixel-art-generator/integrations/unity
-
-<img src="./static/spritefusion-generator.webp" alt="Sprite Fusion Pixel Art Generator" style="width: 100%;">
 
 ## License
 
