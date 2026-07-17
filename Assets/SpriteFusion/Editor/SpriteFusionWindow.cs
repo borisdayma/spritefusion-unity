@@ -142,7 +142,7 @@ namespace SpriteFusion
         async Task StartDeviceFlow()
         {
             SetStatus("Creating connection code...");
-            var response = await Api.PostJson("/api/integrations/auth/device/start", "{}", null, Api.JsonTimeout);
+            var response = await Api.PostJson("/api/integrations/auth/device/start?integration=unity", "{}", null, Api.JsonTimeout);
             if (!response.Ok)
             {
                 SetStatus("Unable to start connection.");
