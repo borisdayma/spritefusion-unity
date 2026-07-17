@@ -4,12 +4,23 @@
 
 <img src="./static/spritefusion-generator.webp" alt="Sprite Fusion Pixel Art Generator" style="width: 100%;">
 
-## Install
+## Installation
 
-1. Install the package from the Unity Asset Store, or download the latest `.unitypackage` release from GitHub.
-2. Import the package into your Unity project.
-3. Open `Window > Sprite Fusion`.
-4. Connect your Sprite Fusion account.
+### Unity package (recommended)
+
+1. Download the latest [Sprite Fusion Unity package](https://github.com/Hugo-Dz/spritefusion-unity/releases/latest/download/spritefusion.unitypackage).
+2. Open your Unity project.
+3. Select `Assets > Import Package > Custom Package`.
+4. Select the downloaded `spritefusion.unitypackage`, then click `Import`.
+5. Open `Window > Sprite Fusion` and connect your account.
+
+### Manual installation from source
+
+1. Open the [latest GitHub release](https://github.com/Hugo-Dz/spritefusion-unity/releases/latest).
+2. Under **Assets**, download **Source code (zip)** and extract it.
+3. Copy the extracted `Assets/SpriteFusion` folder into your Unity project's `Assets` folder.
+4. Open the project in Unity and wait for the editor scripts to compile.
+5. Open `Window > Sprite Fusion` and connect your account.
 
 ## Requirements
 
@@ -27,8 +38,9 @@ Generated assets are written to `Assets/SpriteFusion/Generated`.
 
 ## Useful links
 
-- Website: https://www.spritefusion.com
-- Docs: https://www.spritefusion.com/docs/pixel-art-generator/integrations/unity
+- [Sprite Fusion website](https://www.spritefusion.com)
+- [Unity plugin documentation](https://www.spritefusion.com/docs/pixel-art-generator/integrations/unity)
+- [Latest GitHub release](https://github.com/Hugo-Dz/spritefusion-unity/releases/latest)
 
 ## License
 
