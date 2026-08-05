@@ -214,9 +214,9 @@ namespace SpriteFusion
             }
         }
 
-        public static GenerationEvent ParseLastEvent(string streamText)
+        public static List<GenerationEvent> ParseEvents(string streamText)
         {
-            GenerationEvent last = null;
+            var events = new List<GenerationEvent>();
             var normalized = (streamText ?? "").Replace("\r\n", "\n");
             foreach (var rawEvent in normalized.Split(new[] { "\n\n" }, StringSplitOptions.RemoveEmptyEntries))
             {
@@ -230,14 +230,20 @@ namespace SpriteFusion
                 try
                 {
                     var parsed = JsonUtility.FromJson<GenerationEvent>(string.Join("\n", dataLines));
-                    if (parsed != null) last = parsed;
+                    if (parsed != null) events.Add(parsed);
                 }
                 catch
                 {
                 }
             }
 
-            return last ?? new GenerationEvent();
+            return events;
+        }
+
+        public static GenerationEvent ParseLastEvent(string streamText)
+        {
+            var events = ParseEvents(streamText);
+            return events.Count > 0 ? events[events.Count - 1] : new GenerationEvent();
         }
     }
 }

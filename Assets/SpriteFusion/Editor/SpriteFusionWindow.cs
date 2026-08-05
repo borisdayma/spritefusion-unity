@@ -14,6 +14,8 @@ namespace SpriteFusion
         const string OutputDir = "Assets/SpriteFusion/Generated";
         const int AnimationOutputFrames = 8;
         const int AnimationColors = 24;
+        static readonly int[] GenerationSizes = { 64, 32, 16 };
+        static readonly string[] GenerationSizeLabels = { "64x64", "32x32", "16x16" };
 
         Session _session;
         AssetRegistry _registry;
@@ -24,6 +26,7 @@ namespace SpriteFusion
         bool _pollCancelled;
 
         string _prompt = "";
+        int _selectedGenerationSizeIndex;
         string _animationPrompt = "";
         int _selectedSourceIndex;
         [NonSerialized] bool _isGenerating;
@@ -94,6 +97,10 @@ namespace SpriteFusion
             EditorGUILayout.Space(8);
             EditorGUILayout.LabelField("Generate", EditorStyles.boldLabel);
             _prompt = EditorGUILayout.TextArea(_prompt, GUILayout.MinHeight(60));
+            _selectedGenerationSizeIndex = Mathf.Clamp(
+                EditorGUILayout.Popup("Size", _selectedGenerationSizeIndex, GenerationSizeLabels),
+                0,
+                GenerationSizes.Length - 1);
             using (new EditorGUI.DisabledScope(_isGenerating))
                 if (GUILayout.Button(_isGenerating ? "Generating..." : "Generate"))
                     _ = HandleGenerate();
@@ -109,7 +116,7 @@ namespace SpriteFusion
             }
             else
             {
-                var labels = imageEntries.Select(e => e.DisplayLabel()).ToArray();
+                var labels = imageEntries.Select((e, i) => $"{e.DisplayLabel()} - {i + 1:00}").ToArray();
                 _selectedSourceIndex = Mathf.Clamp(_selectedSourceIndex, 0, imageEntries.Count - 1);
                 _selectedSourceIndex = EditorGUILayout.Popup("Source image", _selectedSourceIndex, labels);
 
@@ -278,7 +285,9 @@ namespace SpriteFusion
             {
                 if (!await EnsureFreshSession()) return;
 
-                var payload = JsonUtility.ToJson(new ImagePayload { prompt = prompt });
+                var size = GenerationSizes[Mathf.Clamp(
+                    _selectedGenerationSizeIndex, 0, GenerationSizes.Length - 1)];
+                var payload = JsonUtility.ToJson(new ImagePayload { prompt = prompt, size = size });
                 var response = await Api.PostJson("/api/pixel-art-generator/image", payload,
                     _session.access_token, Api.GenerationTimeout);
 
@@ -297,19 +306,32 @@ namespace SpriteFusion
                     return;
                 }
 
-                var lastEvent = Api.ParseLastEvent(response.Body);
+                var events = Api.ParseEvents(response.Body);
+                var lastEvent = events.Count > 0 ? events[events.Count - 1] : new GenerationEvent();
                 if (lastEvent.type != "succeeded")
                 {
                     SetGenerationError(lastEvent);
                     return;
                 }
-                if (lastEvent.assets == null || lastEvent.assets.Length == 0)
+
+                var assets = new List<GeneratedAsset>();
+                var assetIds = new HashSet<string>();
+                foreach (var generationEvent in events)
+                {
+                    if (generationEvent.assets == null) continue;
+                    foreach (var asset in generationEvent.assets)
+                    {
+                        if (asset == null || string.IsNullOrEmpty(asset.id)) continue;
+                        if (assetIds.Add(asset.id)) assets.Add(asset);
+                    }
+                }
+                if (assets.Count == 0)
                 {
                     SetStatus("Generation returned no image.");
                     return;
                 }
 
-                var downloadable = lastEvent.assets
+                var downloadable = assets
                     .Where(a => a != null && !string.IsNullOrEmpty(a.assetUrl)).ToList();
                 if (downloadable.Count == 0)
                 {
@@ -596,6 +618,7 @@ namespace SpriteFusion
         class ImagePayload
         {
             public string prompt;
+            public int size;
         }
 
         [Serializable]
@@ -630,7 +653,7 @@ namespace SpriteFusion
             {
                 var label = string.IsNullOrEmpty(prompt) ? "Generated image" : prompt.Trim();
                 if (label.Length > 36) label = label.Substring(0, 33) + "...";
-                return width > 0 && height > 0 ? $"{label} ({width}x{height})" : label;
+                return label;
             }
         }
 
