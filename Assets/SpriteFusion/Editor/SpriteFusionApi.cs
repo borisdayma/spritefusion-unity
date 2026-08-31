@@ -38,8 +38,8 @@ namespace SpriteFusion
     [Serializable]
     public class CreditsInfo
     {
-        public int credits;
-        public string subscriptionPlan;
+        public int reserved;
+        public int remaining;
     }
 
     [Serializable]
@@ -56,14 +56,22 @@ namespace SpriteFusion
         public string createdAt;
         public string updatedAt;
         public string sourceImageUrl;
+        public string spritesheetUrl;
+    }
+
+    [Serializable]
+    public class ApiError
+    {
+        public string code;
+        public string message;
     }
 
     [Serializable]
     public class GenerationEvent
     {
         public string type;
-        public string error;
-        public GeneratedAsset[] assets;
+        public string status;
+        public ApiError error;
         public GeneratedAsset asset;
         public CreditsInfo credits;
     }
@@ -71,8 +79,13 @@ namespace SpriteFusion
     [Serializable]
     public class ErrorResponse
     {
+        public ApiError error;
+    }
+
+    [Serializable]
+    public class DeviceErrorResponse
+    {
         public string error;
-        public CreditsInfo credits;
     }
 
     [Serializable]
@@ -173,7 +186,7 @@ namespace SpriteFusion
                 Content = new StringContent(jsonBody ?? "{}", Encoding.UTF8, "application/json")
             };
 
-            request.Headers.Accept.ParseAdd(path.Contains("/pixel-art-generator/")
+            request.Headers.Accept.ParseAdd(path == "/api/v1/generate"
                 ? "text/event-stream"
                 : "application/json");
 
@@ -238,12 +251,6 @@ namespace SpriteFusion
             }
 
             return events;
-        }
-
-        public static GenerationEvent ParseLastEvent(string streamText)
-        {
-            var events = ParseEvents(streamText);
-            return events.Count > 0 ? events[events.Count - 1] : new GenerationEvent();
         }
     }
 }

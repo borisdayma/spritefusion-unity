@@ -196,7 +196,7 @@ namespace SpriteFusion
                     return;
                 }
 
-                var error = JsonUtility.FromJson<ErrorResponse>(response.Body)?.error ?? "authorization_pending";
+                var error = JsonUtility.FromJson<DeviceErrorResponse>(response.Body)?.error ?? "authorization_pending";
                 switch (error)
                 {
                     case "authorization_pending":
@@ -287,12 +287,12 @@ namespace SpriteFusion
 
                 var size = GenerationSizes[Mathf.Clamp(
                     _selectedGenerationSizeIndex, 0, GenerationSizes.Length - 1)];
-                var payload = JsonUtility.ToJson(new ImagePayload { prompt = prompt, size = size });
-                var response = await Api.PostJson("/api/pixel-art-generator/image", payload,
+                var payload = JsonUtility.ToJson(new ImagePayload { operation = "generate", prompt = prompt, size = size });
+                var response = await Api.PostJson("/api/v1/generate", payload,
                     _session.access_token, Api.GenerationTimeout);
 
                 if (response.Status == 401 && await RefreshSession())
-                    response = await Api.PostJson("/api/pixel-art-generator/image", payload,
+                    response = await Api.PostJson("/api/v1/generate", payload,
                         _session.access_token, Api.GenerationTimeout);
 
                 if (response.Status == 0)
@@ -308,7 +308,7 @@ namespace SpriteFusion
 
                 var events = Api.ParseEvents(response.Body);
                 var lastEvent = events.Count > 0 ? events[events.Count - 1] : new GenerationEvent();
-                if (lastEvent.type != "succeeded")
+                if (lastEvent.type != "completed" || lastEvent.status != "succeeded")
                 {
                     SetGenerationError(lastEvent);
                     return;
@@ -318,12 +318,10 @@ namespace SpriteFusion
                 var assetIds = new HashSet<string>();
                 foreach (var generationEvent in events)
                 {
-                    if (generationEvent.assets == null) continue;
-                    foreach (var asset in generationEvent.assets)
-                    {
-                        if (asset == null || string.IsNullOrEmpty(asset.id)) continue;
-                        if (assetIds.Add(asset.id)) assets.Add(asset);
-                    }
+                    if (generationEvent.type != "output") continue;
+                    var asset = generationEvent.asset;
+                    if (asset == null || string.IsNullOrEmpty(asset.id)) continue;
+                    if (assetIds.Add(asset.id)) assets.Add(asset);
                 }
                 if (assets.Count == 0)
                 {
@@ -402,17 +400,17 @@ namespace SpriteFusion
 
                 var payload = JsonUtility.ToJson(new AnimationPayload
                 {
+                    operation = "animate",
                     prompt = prompt,
-                    imageDataUrl = imageDataUrl,
-                    sourceImageAssetId = source.assetId,
-                    outputFrames = AnimationOutputFrames,
+                    inputs = new[] { new GenerationInput { data_url = imageDataUrl } },
+                    output_frames = AnimationOutputFrames,
                     colors = AnimationColors,
                 });
 
-                var response = await Api.PostJson("/api/pixel-art-generator/animation", payload,
+                var response = await Api.PostJson("/api/v1/generate", payload,
                     _session.access_token, Api.GenerationTimeout);
                 if (response.Status == 401 && await RefreshSession())
-                    response = await Api.PostJson("/api/pixel-art-generator/animation", payload,
+                    response = await Api.PostJson("/api/v1/generate", payload,
                         _session.access_token, Api.GenerationTimeout);
 
                 if (response.Status == 0)
@@ -426,24 +424,31 @@ namespace SpriteFusion
                     return;
                 }
 
-                var lastEvent = Api.ParseLastEvent(response.Body);
-                if (lastEvent.type != "success")
+                var events = Api.ParseEvents(response.Body);
+                var lastEvent = events.Count > 0 ? events[events.Count - 1] : new GenerationEvent();
+                if (lastEvent.type != "completed" || lastEvent.status != "succeeded")
                 {
                     SetGenerationError(lastEvent);
                     return;
                 }
 
-                var asset = lastEvent.asset;
+                var asset = events
+                    .Where(generationEvent => generationEvent.type == "output")
+                    .Select(generationEvent => generationEvent.asset)
+                    .LastOrDefault(generatedAsset => generatedAsset != null);
                 if (asset == null || string.IsNullOrEmpty(asset.id))
                 {
                     SetStatus("Animation returned no asset.");
                     return;
                 }
 
-                var url = $"{Api.BaseUrl}/api/pixel-art-generator/assets/{Uri.EscapeDataString(asset.id)}/file?file=spritesheet";
-                var download = await Api.GetBytes(url, _session.access_token, Api.DownloadTimeout);
-                if (download.Status == 401 && await RefreshSession())
-                    download = await Api.GetBytes(url, _session.access_token, Api.DownloadTimeout);
+                if (string.IsNullOrEmpty(asset.spritesheetUrl))
+                {
+                    SetStatus("Animation returned no spritesheet URL.");
+                    return;
+                }
+
+                var download = await Api.GetBytes(asset.spritesheetUrl, null, Api.DownloadTimeout);
                 if (!download.Ok)
                 {
                     SetStatus("Unable to download animation spritesheet.");
@@ -565,9 +570,7 @@ namespace SpriteFusion
 
         void SetGenerationError(GenerationEvent evt)
         {
-            var message = string.IsNullOrEmpty(evt.error) ? "Generation failed." : evt.error;
-            if (evt.credits != null && !string.IsNullOrEmpty(evt.credits.subscriptionPlan))
-                message = $"{message} Credits: {evt.credits.credits}.";
+            var message = string.IsNullOrEmpty(evt.error?.message) ? "Generation failed." : evt.error.message;
             SetStatus(message);
         }
 
@@ -575,19 +578,17 @@ namespace SpriteFusion
         {
             var error = JsonUtility.FromJson<ErrorResponse>(string.IsNullOrEmpty(body) ? "{}" : body)
                         ?? new ErrorResponse();
+            var errorMessage = error.error?.message ?? "";
 
             var needsPlan = statusCode == 402 &&
-                ((error.credits != null && error.credits.subscriptionPlan == "none") ||
-                 error.error == "An active subscription is required.");
+                errorMessage.StartsWith("An active subscription is required.", StringComparison.Ordinal);
             if (needsPlan)
             {
                 SetStatus("You need an active plan", true);
                 return;
             }
 
-            var message = string.IsNullOrEmpty(error.error) ? "Generation failed." : error.error;
-            if (error.credits != null && !string.IsNullOrEmpty(error.credits.subscriptionPlan))
-                message = $"{message} Credits: {error.credits.credits}.";
+            var message = string.IsNullOrEmpty(errorMessage) ? "Generation failed." : errorMessage;
             SetStatus(message);
         }
 
@@ -617,17 +618,24 @@ namespace SpriteFusion
         [Serializable]
         class ImagePayload
         {
+            public string operation;
             public string prompt;
             public int size;
         }
 
         [Serializable]
+        class GenerationInput
+        {
+            public string data_url;
+        }
+
+        [Serializable]
         class AnimationPayload
         {
+            public string operation;
             public string prompt;
-            public string imageDataUrl;
-            public string sourceImageAssetId;
-            public int outputFrames;
+            public GenerationInput[] inputs;
+            public int output_frames;
             public int colors;
         }
     }
