@@ -374,6 +374,11 @@ namespace SpriteFusion
             }
 
             var source = imageEntries[Mathf.Clamp(_selectedSourceIndex, 0, imageEntries.Count - 1)];
+            if (string.IsNullOrEmpty(source.assetId))
+            {
+                SetStatus("Source image is missing its Sprite Fusion asset ID.");
+                return;
+            }
 
             var prompt = (_animationPrompt ?? "").Trim();
             if (prompt == "")
@@ -381,16 +386,6 @@ namespace SpriteFusion
                 SetStatus("Animation prompt is required.");
                 return;
             }
-
-            var sourceFullPath = Path.GetFullPath(source.assetPath);
-            if (!File.Exists(sourceFullPath))
-            {
-                SetStatus("Unable to read source image.");
-                return;
-            }
-
-            var imageDataUrl = "data:image/png;base64," +
-                Convert.ToBase64String(File.ReadAllBytes(sourceFullPath));
 
             _isAnimating = true;
             SetStatus("");
@@ -402,7 +397,7 @@ namespace SpriteFusion
                 {
                     operation = "animate",
                     prompt = prompt,
-                    inputs = new[] { new GenerationInput { data_url = imageDataUrl } },
+                    inputs = new[] { new GenerationInput { asset_id = source.assetId } },
                     output_frames = AnimationOutputFrames,
                     colors = AnimationColors,
                 });
@@ -626,7 +621,7 @@ namespace SpriteFusion
         [Serializable]
         class GenerationInput
         {
-            public string data_url;
+            public string asset_id;
         }
 
         [Serializable]
