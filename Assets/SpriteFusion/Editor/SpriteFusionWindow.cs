@@ -326,6 +326,11 @@ namespace SpriteFusion
                     SetStatus("Generation returned no image.");
                     return;
                 }
+                // In batch order: sprites stream as they are ready, and each image asset's batchIndex is its place in the batch.
+                assets = assets.Select((asset, arrival) => (asset, arrival))
+                    .OrderBy(entry => entry.asset.batchIndex >= 0 ? entry.asset.batchIndex : entry.arrival)
+                    .Select(entry => entry.asset)
+                    .ToList();
 
                 var downloadable = assets
                     .Where(a => a != null && !string.IsNullOrEmpty(a.assetUrl)).ToList();
